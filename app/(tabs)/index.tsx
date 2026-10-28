@@ -1,98 +1,118 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { router } from "expo-router";
+import { useState } from "react";
+import { Alert, FlatList, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import SearchBar from "../../components/search-bar";
+import StudentDetail from "../../components/student-detail";
+import StudentItem from "../../components/student-item";
+import { useStudents } from "../../context/students-context";
+import { Student } from "../../data/students";
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+export default function Index() {
+  const { students, dispatch } = useStudents();
 
-export default function HomeScreen() {
+  const [query, setQuery] = useState("");
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+
+  const filtered = students.filter(
+    (s) =>
+      s.name.toLowerCase().includes(query.toLowerCase()) ||
+      s.department.toLowerCase().includes(query.toLowerCase())
+  );
+
+  const handleSelect = (student: Student) => {
+    setSelectedStudent((prev) => (prev?.id === student.id ? null : student));
+  };
+
+  // ===== Lab Task Feature 1 — Reset with confirmation =====
+  const handleReset = () => {
+    const reset = () => {
+      dispatch({ type: "RESET" });
+      setSelectedStudent(null);
+    };
+
+    if (Platform.OS === "web") {
+      if (window.confirm("Restore the original student list?")) {
+        reset();
+      }
+      return;
+    }
+
+    Alert.alert("Reset Directory", "Restore the original student list?", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Reset", style: "destructive", onPress: reset },
+    ]);
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    <SafeAreaView style={styles.screen}>
+      <View style={styles.titleBar}>
+        {/* ===== Lab Task Feature 2 — live count (no extra state) ===== */}
+        <Text style={styles.title}>Student Directory ({students.length})</Text>
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+        <View style={styles.buttonRow}>
+          <Pressable style={styles.resetButton} onPress={handleReset}>
+            <Text style={styles.resetButtonText}>Reset</Text>
+          </Pressable>
+          <Pressable style={styles.addButton} onPress={() => router.push("/(tabs)/add-student")}>
+            <Text style={styles.addButtonText}>+ Add</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      <SearchBar value={query} onChangeText={setQuery} />
+
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <StudentItem
+            student={item}
+            onPress={handleSelect}
+            isSelected={selectedStudent?.id === item.id}
+          />
+        )}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Text style={styles.emptyText}>No students match "{query}"</Text>
+          </View>
+        }
+      />
+
+      {selectedStudent && (
+        <StudentDetail student={selectedStudent} onRemoved={() => setSelectedStudent(null)} />
+      )}
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  screen: { flex: 1, backgroundColor: "#F0F4F8" },
+  titleBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: "#0D1F4E",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  title: { fontSize: 18, fontWeight: "bold", color: "#FFFFFF", flexShrink: 1 },
+  buttonRow: { flexDirection: "row", gap: 8 },
+  resetButton: {
+    borderWidth: 1,
+    borderColor: "#FFFFFF",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  resetButtonText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
+  addButton: {
+    backgroundColor: "#0D9488",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 8,
   },
+  addButtonText: { color: "#FFFFFF", fontWeight: "700", fontSize: 13 },
+  empty: { padding: 40, alignItems: "center" },
+  emptyText: { fontSize: 14, color: "#94A3B8" },
 });
